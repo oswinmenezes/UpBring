@@ -1,13 +1,19 @@
 import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
-import './App.css'
+import LinkedInAuthButton from './feature/auth/linkedin_auth/auth_button'
+import { useLinkedInCallback } from './feature/auth/linkedin_auth/hooks/useLinkedInCallback'
 
 function App() {
   const [count, setCount] = useState(0)
 
+  // This custom hook runs once when the App mounts, parses the URL 
+  // for LinkedIn redirect parameters, and triggers the success/error handlers
+  useLinkedInCallback();
+
   return (
     <>
+      <LinkedInAuthButton />
       <div>
         <a href="https://vite.dev" target="_blank">
           <img src={viteLogo} className="logo" alt="Vite logo" />
