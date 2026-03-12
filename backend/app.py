@@ -4,6 +4,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
 from github import Github, GithubException
+from JobModel import find_job_role, skill_to_learn
 
 # Load environment variables
 load_dotenv()
@@ -92,6 +93,69 @@ def get_github_repos():
         return jsonify({'error': e.data.get('message', 'GitHub API error')}), e.status
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ─── Job Model Endpoints ────────────────────────────────────────────────────
+
+@app.route('/api/job/find-role', methods=['POST'])
+def get_job_role():
+    """
+    Predict the best-fit job role from a list of skills.
+
+    Request body (JSON):
+        { "skills": ["Python", "Django", "React", ...] }
+
+    Response (JSON):
+        { "role": "Backend Developer" }
+    """
+    data = request.get_json()
+    skills = data.get('skills', [])
+
+    if not skills or not isinstance(skills, list):
+        return jsonify({'error': '"skills" must be a non-empty list of strings'}), 400
+
+    try:
+        role = find_job_role(skills)
+        return jsonify({'role': role})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/job/skill-to-learn', methods=['POST'])
+def get_skills_to_learn():
+    """
+    Return a Gemini-generated learning roadmap for a target job role.
+
+    Request body (JSON):
+        {
+          "skills": ["Python", "Git"],   # skills the user already has
+          "role":   "Backend Developer"   # desired target role
+        }
+
+    Response (JSON):
+        {
+          "role":        "Backend Developer",
+          "description": "...",
+          "roadmap":     ["Step 1", ...],
+          "courselinks": ["URL..", ...]
+        }
+    """
+    data = request.get_json()
+    skills = data.get('skills', [])
+    role   = data.get('role', '')
+
+    if not role:
+        return jsonify({'error': '"role" is required'}), 400
+    if not isinstance(skills, list):
+        return jsonify({'error': '"skills" must be a list of strings'}), 400
+
+    try:
+        result = skill_to_learn(skills, role)
+        if 'error' in result:
+            return jsonify(result), 404
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
