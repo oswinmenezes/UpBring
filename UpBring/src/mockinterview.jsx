@@ -58,29 +58,29 @@ Overall: ...
 const toSpeech = (t) =>
   t.replace(/^(QUESTION:|NEXT QUESTION:|FEEDBACK:|FINAL EVALUATION:)\s*/gm,"").replace(/\n+/g," ").trim();
 
-export default function App() {
-  const [screen,  setScreen]  = useState("setup");
-  const [role,    setRole]    = useState(null);
-  const [custom,  setCustom]  = useState("");
-  const [level,   setLevel]   = useState("Mid-Level");
-  const [style,   setStyle]   = useState("Mixed");
-  const [mode,    setMode]    = useState("both"); // text | voice | both
+export default function MockInterview() {
+  const [screen,   setScreen]   = useState("setup");
+  const [role,     setRole]     = useState(null);
+  const [custom,   setCustom]   = useState("");
+  const [level,    setLevel]    = useState("Mid-Level");
+  const [style,    setStyle]    = useState("Mixed");
+  const [mode,     setMode]     = useState("both");
 
   const [messages,  setMessages]  = useState([]);
   const [input,     setInput]     = useState("");
   const [loading,   setLoading]   = useState(false);
-  const [qCount,    setQCount]    = useState(0);
-  const [evalText,  setEvalText]  = useState(null);
+  const [qCount,     setQCount]    = useState(0);
+  const [evalText,   setEvalText]  = useState(null);
 
   const [recording, setRecording] = useState(false);
-  const [speaking,  setSpeaking]  = useState(false);
+  const [speaking,   setSpeaking]  = useState(false);
   const [audioOn,   setAudioOn]   = useState(true);
   const [transcript,setTranscript]= useState("");
-  const [micErr,    setMicErr]    = useState("");
-  const [audioLvl,  setAudioLvl]  = useState(0);
+  const [micErr,     setMicErr]    = useState("");
+  const [audioLvl,   setAudioLvl]  = useState(0);
 
-  const [typeText,  setTypeText]  = useState("");
-  const [typing,    setTyping]    = useState(false);
+  const [typeText,   setTypeText]  = useState("");
+  const [typing,     setTyping]    = useState(false);
 
   const bottomRef   = useRef(null);
   const recRef      = useRef(null);
@@ -96,7 +96,6 @@ export default function App() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, typeText]);
   useEffect(() => () => { synthRef.current?.cancel(); stopRec(); }, []);
 
-  // ── TTS ──────────────────────────────────────────────────────────
   const speak = useCallback((text) => {
     if (!audioOn || !synthRef.current) return;
     synthRef.current.cancel();
@@ -113,10 +112,9 @@ export default function App() {
 
   const stopSpeak = () => { synthRef.current?.cancel(); setSpeaking(false); };
 
-  // ── Mic visualiser ───────────────────────────────────────────────
   const startViz = (stream) => {
     try {
-      const ctx = new AudioContext();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const src = ctx.createMediaStreamSource(stream);
       const an  = ctx.createAnalyser(); an.fftSize = 256;
       src.connect(an);
@@ -131,7 +129,6 @@ export default function App() {
   };
   const stopViz = () => { cancelAnimationFrame(rafRef.current); setAudioLvl(0); };
 
-  // ── STT ─────────────────────────────────────────────────────────
   const stopRec = () => {
     recRef.current?.stop();
     streamRef.current?.getTracks().forEach(t=>t.stop());
@@ -175,7 +172,6 @@ export default function App() {
     }
   };
 
-  // ── Typing animation ─────────────────────────────────────────────
   const typeAnim = (text, done) => {
     setTyping(true); setTypeText("");
     let i = 0;
@@ -185,36 +181,69 @@ export default function App() {
     },9);
   };
 
-  // ── API ──────────────────────────────────────────────────────────
-  const callAPI = async (msgs, extra="") => {
-    const res = await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000,
-        system: sysPrompt(roleName,level,style)+extra, messages: msgs })
+  // ── API (GEMINI FIXED) ──────────────────────────────────────────
+  const callAPI = async (msgs, extra = "") => {
+    const API_KEY = "Apikey"; 
+    const URL = "url";
+
+    // Map roles: Gemini only accepts "user" or "model"
+    const contents = msgs.map(m => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }]
+    }));
+
+    const payload = {
+      contents: contents,
+      systemInstruction: {
+        parts: [{ text: sysPrompt(roleName, level, style) + extra }]
+      },
+      generationConfig: {
+        maxOutputTokens: 1000,
+        temperature: 0.7,
+      }
+    };
+
+    const res = await fetch(URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
+
     const d = await res.json();
-    return d.content?.[0]?.text || "";
+    if (d.error) {
+      console.error("Gemini Error:", d.error);
+      throw new Error(d.error.message);
+    }
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || "";
   };
 
   const startInterview = async () => {
     setScreen("interview"); setLoading(true);
     try {
-      const text = await callAPI([{ role:"user", content:"Please start the interview with the first question." }]);
+      // Must start with a "user" message for Gemini
+      const text = await callAPI([{ role:"user", content:"Let's start. Please ask the first question." }]);
       setLoading(false);
       typeAnim(text, ft => { setMessages([{role:"assistant",content:ft}]); setQCount(1); speak(ft); });
-    } catch { setLoading(false); setMessages([{role:"assistant",content:"Failed to start. Please try again."}]); }
+    } catch (err) { 
+      setLoading(false); 
+      setMessages([{role:"assistant",content: "Error: " + err.message}]); 
+    }
   };
 
   const send = async (override) => {
     const msg = (override!==undefined ? override : input).trim();
     if (!msg||loading||typing) return;
     setInput(""); setTranscript(""); finalRef.current=""; stopSpeak();
-    const newMsgs = [...messages,{role:"user",content:msg}];
-    setMessages(newMsgs); setLoading(true);
+    
+    const newMsgs = [...messages, {role:"user", content:msg}];
+    setMessages(newMsgs); 
+    setLoading(true);
+
     const isLast = qCount>=5;
-    const extra  = isLast ? " This was the 5th final question. Provide FINAL EVALUATION now." : "";
+    const extra  = isLast ? " This was the final answer. Provide FINAL EVALUATION now." : "";
+
     try {
-      const text = await callAPI(newMsgs.map(m=>({role:m.role,content:m.content})), extra);
+      const text = await callAPI(newMsgs, extra);
       setLoading(false);
       typeAnim(text, ft => {
         setMessages(p=>[...p,{role:"assistant",content:ft}]);
@@ -222,7 +251,10 @@ export default function App() {
         if (isLast) { setEvalText(ft); setTimeout(()=>setScreen("done"),1800); }
         else setQCount(c=>c+1);
       });
-    } catch { setLoading(false); setMessages(p=>[...p,{role:"assistant",content:"Error. Please try again."}]); }
+    } catch (err) {
+      setLoading(false);
+      setMessages(p=>[...p,{role:"assistant",content:"Failed to get response from AI."}]);
+    }
   };
 
   const reset = () => {
@@ -231,7 +263,6 @@ export default function App() {
     setQCount(0); setEvalText(null); setTypeText(""); finalRef.current="";
   };
 
-  // ── Message renderer ─────────────────────────────────────────────
   const renderMsg = (text) => text.split("\n").map((line,i)=>{
     if (/^(QUESTION:|NEXT QUESTION:)/.test(line))
       return <p key={i} style={{margin:"5px 0",fontWeight:700,color:C.dark,fontSize:14}}>{line.replace(/^(NEXT )?QUESTION:\s*/,"")}</p>;
@@ -244,7 +275,6 @@ export default function App() {
 
   const BARS = [0.4,0.65,1,0.8,0.55,0.9,0.5,0.75,1,0.6,0.45,0.8,0.7,0.35];
 
-  // ════════════════════════════════════════════════════════════════
   return (
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'DM Sans',sans-serif",color:C.dark}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,wght@0,300;0,600;0,700;1,300;1,600&display=swap" rel="stylesheet"/>
@@ -276,18 +306,17 @@ export default function App() {
         .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
       `}</style>
 
-      {/* ── NAV ─────────────────────────────────────────────── */}
       <nav style={{borderBottom:`1px solid ${C.gray4}`,background:C.white,padding:"0 40px",display:"flex",justifyContent:"space-between",alignItems:"center",height:60,position:"sticky",top:0,zIndex:50}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:28,height:28,background:C.dark,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center"}}>
             <div style={{width:14,height:14,background:C.lime,borderRadius:3}}/>
           </div>
-          <span style={{fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,letterSpacing:"-.3px"}}>Growmark Interview</span>
+          <span style={{fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600}}>Growmark Interview</span>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center"}}>
           {screen==="interview" && (
             <button onClick={()=>{setAudioOn(e=>!e);if(speaking)stopSpeak();}}
-              style={{background:"transparent",border:`1.5px solid ${C.gray4}`,color:audioOn?C.dark:C.gray3,padding:"6px 14px",borderRadius:8,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit"}}>
+              style={{background:"transparent",border:`1.5px solid ${C.gray4}`,color:audioOn?C.dark:C.gray3,padding:"6px 14px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
               {audioOn?"🔊 Sound on":"🔇 Muted"}
             </button>
           )}
@@ -299,11 +328,8 @@ export default function App() {
         </div>
       </nav>
 
-      {/* ══════════════ SETUP ══════════════════════════════════ */}
       {screen==="setup" && (
         <div style={{maxWidth:860,margin:"0 auto",padding:"52px 24px 80px"}}>
-
-          {/* Hero */}
           <div className="fadeUp" style={{marginBottom:52}}>
             <div style={{display:"inline-block",background:C.lime,color:C.dark,fontSize:11,fontWeight:600,letterSpacing:"2px",padding:"5px 14px",borderRadius:20,marginBottom:18}}>
               AI-POWERED PRACTICE
@@ -311,21 +337,17 @@ export default function App() {
             <h1 style={{fontFamily:"'Fraunces',serif",fontSize:"clamp(36px,5vw,58px)",fontWeight:600,lineHeight:1.1,letterSpacing:"-1.5px",marginBottom:14}}>
               Mock Interview<br/><em style={{color:C.brown,fontStyle:"italic"}}>Conductor</em>
             </h1>
-            <p style={{color:C.gray2,fontSize:16,maxWidth:480,lineHeight:1.65}}>
-              Practice for any role with AI that asks real questions, gives real feedback, and scores your performance.
-            </p>
           </div>
 
-          {/* Step 1 – Role */}
-          <div className="fadeUp" style={{marginBottom:44,animationDelay:".06s",opacity:0,animationFillMode:"forwards"}}>
+          <div className="fadeUp" style={{marginBottom:44,opacity:0,animationFillMode:"forwards"}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
               <div style={{width:26,height:26,background:C.dark,color:C.lime,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700}}>1</div>
-              <span style={{fontSize:13,fontWeight:600,letterSpacing:".5px",color:C.gray1}}>SELECT YOUR ROLE</span>
+              <span style={{fontSize:13,fontWeight:600,color:C.gray1}}>SELECT YOUR ROLE</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
               {ROLES.map(r=>(
                 <div key={r.id} className={`role-card ${role?.id===r.id?"active":""}`}
-                  style={{background:C.white,borderRadius:10,padding:"16px 14px"}}
+                  style={{background:C.white,borderRadius:10,padding:"16px 14px", border:`1.5px solid ${role?.id===r.id?C.dark:C.gray4}`}}
                   onClick={()=>setRole(r)}>
                   <div className="role-icon" style={{fontSize:20,marginBottom:8,color:role?.id===r.id?C.lime:C.gray2,fontFamily:"monospace",fontWeight:700}}>{r.icon}</div>
                   <div className="role-name" style={{fontSize:13,fontWeight:600,color:role?.id===r.id?C.lime:C.dark,marginBottom:3}}>{r.label}</div>
@@ -335,16 +357,15 @@ export default function App() {
             </div>
             {role?.id==="custom" && (
               <input value={custom} onChange={e=>setCustom(e.target.value)}
-                placeholder="e.g. Cybersecurity Analyst, Growth Hacker…"
+                placeholder="e.g. Cybersecurity Analyst..."
                 style={{marginTop:12,width:"100%",background:C.white,border:`1.5px solid ${C.gray4}`,color:C.dark,padding:"13px 16px",borderRadius:10,fontSize:14,fontFamily:"inherit"}}/>
             )}
           </div>
 
-          {/* Step 2 – Level */}
-          <div className="fadeUp" style={{marginBottom:36,animationDelay:".12s",opacity:0,animationFillMode:"forwards"}}>
+          <div className="fadeUp" style={{marginBottom:36,opacity:0,animationFillMode:"forwards"}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
               <div style={{width:26,height:26,background:C.dark,color:C.lime,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700}}>2</div>
-              <span style={{fontSize:13,fontWeight:600,letterSpacing:".5px",color:C.gray1}}>EXPERIENCE LEVEL</span>
+              <span style={{fontSize:13,fontWeight:600,color:C.gray1}}>EXPERIENCE LEVEL</span>
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {LEVELS.map(l=>(
@@ -356,11 +377,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* Step 3 – Style */}
-          <div className="fadeUp" style={{marginBottom:36,animationDelay:".16s",opacity:0,animationFillMode:"forwards"}}>
+          <div className="fadeUp" style={{marginBottom:36,opacity:0,animationFillMode:"forwards"}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
               <div style={{width:26,height:26,background:C.dark,color:C.lime,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700}}>3</div>
-              <span style={{fontSize:13,fontWeight:600,letterSpacing:".5px",color:C.gray1}}>INTERVIEW STYLE</span>
+              <span style={{fontSize:13,fontWeight:600,color:C.gray1}}>INTERVIEW STYLE</span>
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {STYLES.map(s=>(
@@ -372,189 +392,97 @@ export default function App() {
             </div>
           </div>
 
-          {/* Step 4 – Mode */}
-          <div className="fadeUp" style={{marginBottom:48,animationDelay:".2s",opacity:0,animationFillMode:"forwards"}}>
+          <div className="fadeUp" style={{marginBottom:48,opacity:0,animationFillMode:"forwards"}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
               <div style={{width:26,height:26,background:C.dark,color:C.lime,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700}}>4</div>
-              <span style={{fontSize:13,fontWeight:600,letterSpacing:".5px",color:C.gray1}}>HOW WILL YOU ANSWER?</span>
+              <span style={{fontSize:13,fontWeight:600,color:C.gray1}}>MODE</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,maxWidth:540}}>
-              {[{id:"text",icon:"⌨️",label:"Type Only",desc:"Keyboard input"},{id:"voice",icon:"🎙️",label:"Voice Only",desc:"Speak your answers"},{id:"both",icon:"✦",label:"Both",desc:"Voice + type together"}].map(m=>(
+              {[{id:"text",icon:"⌨️",label:"Type Only"},{id:"voice",icon:"🎙️",label:"Voice Only"},{id:"both",icon:"✦",label:"Both"}].map(m=>(
                 <div key={m.id} className={`mode-card ${mode===m.id?"active":""}`} onClick={()=>setMode(m.id)}>
                   <div style={{fontSize:22,marginBottom:8}}>{m.icon}</div>
-                  <div style={{fontSize:13,fontWeight:600,marginBottom:3}}>{m.label}</div>
-                  <p style={{fontSize:11,color:C.gray2}}>{m.desc}</p>
+                  <div style={{fontSize:13,fontWeight:600}}>{m.label}</div>
                 </div>
               ))}
             </div>
-            <p style={{fontSize:12,color:C.gray3,marginTop:10}}>🔊 Interviewer speaks questions aloud — mute anytime in the toolbar.</p>
           </div>
 
-          {/* CTA */}
           <button onClick={startInterview}
             disabled={!role||(role.id==="custom"&&!custom.trim())}
-            style={{background: role?C.dark:"#ccc",color:role?C.lime:C.white,border:"none",padding:"16px 44px",borderRadius:12,fontSize:15,fontWeight:600,cursor:role?"pointer":"not-allowed",fontFamily:"inherit",display:"flex",alignItems:"center",gap:10,transition:"all .2s",boxShadow:role?"0 4px 24px rgba(18,20,20,.18)":"none"}}>
-            Begin Interview
-            <span style={{fontSize:18}}>→</span>
+            style={{background: role?C.dark:"#ccc",color:role?C.lime:C.white,border:"none",padding:"16px 44px",borderRadius:12,fontSize:15,fontWeight:600,cursor:role?"pointer":"not-allowed",fontFamily:"inherit"}}>
+            Begin Interview →
           </button>
         </div>
       )}
 
-      {/* ══════════════ INTERVIEW ════════════════════════════ */}
       {screen==="interview" && (
         <div style={{maxWidth:780,margin:"0 auto",padding:"32px 24px",display:"flex",flexDirection:"column",minHeight:"calc(100vh - 60px)"}}>
-
-          {/* Progress bar */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
             <div>
-              <p style={{fontSize:12,color:C.gray2,marginBottom:3}}>{roleName} · {level}</p>
-              <p style={{fontSize:11,color:C.gray3,letterSpacing:".5px"}}>{style.toUpperCase()} INTERVIEW</p>
+              <p style={{fontSize:12,color:C.gray2}}>{roleName} · {level}</p>
+              <p style={{fontSize:11,color:C.gray3}}>{style.toUpperCase()}</p>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               {[1,2,3,4,5].map(n=>(
-                <div key={n} style={{width:32,height:5,borderRadius:3,background: n<qCount?C.dark:n===qCount?C.lime:C.gray4,transition:"background .3s"}}/>
+                <div key={n} style={{width:32,height:5,borderRadius:3,background: n<qCount?C.dark:n===qCount?C.lime:C.gray4}}/>
               ))}
-              <span style={{fontSize:12,color:C.gray2,marginLeft:6,fontWeight:500}}>{qCount}/5</span>
             </div>
           </div>
 
-          {/* Speaking bar */}
           {speaking && (
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"10px 16px",background:C.bgCream,border:`1px solid ${C.lime}`,borderRadius:10}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:C.dark,animation:"shimmer .8s infinite"}}/>
-              <span style={{fontSize:12,color:C.dark,fontWeight:500}}>Interviewer is speaking…</span>
-              <button onClick={stopSpeak} style={{marginLeft:"auto",background:"transparent",border:`1px solid ${C.gray4}`,color:C.gray1,padding:"3px 10px",borderRadius:6,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Skip ▶</button>
+              <span style={{fontSize:12,color:C.dark}}>Interviewer is speaking…</span>
+              <button onClick={stopSpeak} style={{marginLeft:"auto",background:"transparent",border:`1px solid ${C.gray4}`,fontSize:11,cursor:"pointer"}}>Skip ▶</button>
             </div>
           )}
 
-          {/* Chat */}
           <div style={{flex:1,minHeight:340,maxHeight:440,overflowY:"auto",background:C.white,border:`1px solid ${C.gray4}`,borderRadius:16,padding:"20px",marginBottom:16,display:"flex",flexDirection:"column",gap:14}}>
             {messages.map((m,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start",gap:10,alignItems:"flex-start"}}>
-                {m.role==="assistant" && (
-                  <div style={{width:30,height:30,borderRadius:8,background:C.dark,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",marginTop:2}}>
-                    <div style={{width:12,height:12,background:C.lime,borderRadius:3}}/>
-                  </div>
-                )}
-                <div style={{maxWidth:"76%",padding:"13px 16px",borderRadius:m.role==="user"?"14px 14px 4px 14px":"4px 14px 14px 14px",background:m.role==="user"?C.dark:C.bgCream,border:`1px solid ${m.role==="user"?"transparent":C.gray4}`}}>
-                  {m.role==="assistant"
-                    ? renderMsg(m.content)
-                    : <p style={{color:C.limeSoft,fontSize:14,lineHeight:1.65}}>{m.content}</p>
-                  }
+              <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start",gap:10}}>
+                <div style={{maxWidth:"76%",padding:"13px 16px",borderRadius:m.role==="user"?"14px 14px 4px 14px":"4px 14px 14px 14px",background:m.role==="user"?C.dark:C.bgCream, color:m.role==="user"?C.white:C.dark}}>
+                  {m.role==="assistant" ? renderMsg(m.content) : m.content}
                 </div>
               </div>
             ))}
-
             {(loading||typing) && (
-              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                <div style={{width:30,height:30,borderRadius:8,background:C.dark,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <div style={{width:12,height:12,background:C.lime,borderRadius:3,animation:"spin 1s linear infinite"}}/>
-                </div>
-                <div style={{padding:"13px 16px",borderRadius:"4px 14px 14px 14px",background:C.bgCream,border:`1px solid ${C.gray4}`,maxWidth:"76%"}}>
-                  {typing && typeText
-                    ? <>{renderMsg(typeText)}<span className="cursor" style={{color:C.brown}}>|</span></>
-                    : <div style={{display:"flex",gap:5,padding:"4px 0"}}><div className="dot"/><div className="dot"/><div className="dot"/></div>
-                  }
-                </div>
-              </div>
+              <div style={{fontSize:12, color:C.gray3}}>Interviewer is thinking...</div>
             )}
             <div ref={bottomRef}/>
           </div>
 
-          {/* Input Panel */}
           <div style={{background:C.white,border:`1px solid ${C.gray4}`,borderRadius:16,padding:"16px 18px"}}>
-
             {showVoice && (
               <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:showText?14:0}}>
-                {/* Mic */}
-                <div style={{position:"relative",width:48,height:48,flexShrink:0}}>
-                  {recording && [0,1].map(k=>(
-                    <div key={k} style={{position:"absolute",top:"50%",left:"50%",width:48,height:48,borderRadius:"50%",border:`2px solid ${C.dark}`,animation:"ripple 1.6s ease-out infinite",animationDelay:`${k*.7}s`,pointerEvents:"none"}}/>
-                  ))}
-                  <button onClick={toggleMic} disabled={loading||typing}
-                    style={{position:"absolute",inset:0,borderRadius:"50%",border:`2px solid ${recording?C.dark:C.gray4}`,background:recording?C.dark:C.white,color:recording?C.lime:C.gray2,fontSize:18,cursor:loading||typing?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
-                    {recording?"⏹":"🎙"}
-                  </button>
-                </div>
-
-                {/* Waveform */}
-                <div style={{display:"flex",alignItems:"center",gap:2.5,height:32,flex:1}}>
-                  {BARS.map((h,i)=>(
-                    <div key={i} style={{width:3,borderRadius:2,background:recording?C.dark:C.gray4,height:recording?`${Math.max(4,audioLvl*h*.32)}px`:"4px",transition:"height .08s ease"}}/>
-                  ))}
-                </div>
-
-                <span style={{fontSize:11,color:recording?C.dark:C.gray3,fontWeight:recording?600:400,letterSpacing:"1px",minWidth:80,textAlign:"right"}}>
-                  {recording?"● REC":"Tap to speak"}
-                </span>
-
+                <button onClick={toggleMic} disabled={loading||typing}
+                  style={{width:48,height:48,borderRadius:"50%",border:`2px solid ${recording?C.dark:C.gray4}`,background:recording?C.dark:C.white,color:recording?C.lime:C.gray2,cursor:"pointer"}}>
+                  {recording?"⏹":"🎙"}
+                </button>
+                <span style={{fontSize:11}}>{recording?"● REC":"Tap to speak"}</span>
                 {mode==="voice" && transcript && !recording && (
-                  <button onClick={()=>send(transcript)} disabled={loading||typing}
-                    style={{background:C.dark,color:C.lime,border:"none",padding:"8px 16px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>
-                    Send →
-                  </button>
+                  <button onClick={()=>send(transcript)} style={{background:C.dark,color:C.lime,padding:"8px 16px",borderRadius:8,cursor:"pointer"}}>Send →</button>
                 )}
               </div>
             )}
-
-            {mode==="voice" && transcript && (
-              <div style={{background:C.bgCream,border:`1px solid ${C.gray4}`,borderRadius:8,padding:"10px 14px",marginBottom:showText?12:0,fontSize:13,color:C.gray1,fontStyle:"italic"}}>
-                "{transcript}"
-              </div>
-            )}
-
             {showText && (
-              <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
+              <div style={{display:"flex",gap:10}}>
                 <textarea value={input} onChange={e=>setInput(e.target.value)}
                   onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
-                  placeholder={recording?"Listening… (edit if needed)":"Type your answer… (Enter to send, Shift+Enter for newline)"}
-                  rows={2} disabled={loading||typing}
-                  style={{flex:1,background:C.bg,border:`1.5px solid ${input?C.dark:C.gray4}`,color:C.dark,borderRadius:10,padding:"12px 14px",fontSize:14,fontFamily:"inherit",resize:"none",lineHeight:1.6,transition:"border-color .2s"}}/>
-                <button onClick={()=>send()} disabled={!input.trim()||loading||typing} className="send-btn"
-                  style={{background:input.trim()&&!loading&&!typing?C.dark:"#ddd",color:input.trim()&&!loading&&!typing?C.lime:C.gray3,border:"none",borderRadius:10,padding:"0 20px",fontSize:20,cursor:"pointer",height:60,flexShrink:0}}>
-                  →
-                </button>
+                  placeholder="Type your answer..."
+                  style={{flex:1,background:C.bg,border:`1.5px solid ${C.gray4}`,borderRadius:10,padding:"12px",resize:"none"}}/>
+                <button onClick={()=>send()} disabled={!input.trim()||loading||typing} style={{background:C.dark,color:C.lime,borderRadius:10,padding:"0 20px",cursor:"pointer"}}>→</button>
               </div>
             )}
-
-            {micErr && <p style={{fontSize:12,color:"#c0392b",marginTop:8}}>⚠ {micErr}</p>}
           </div>
         </div>
       )}
 
-      {/* ══════════════ DONE ══════════════════════════════════ */}
       {screen==="done" && (
         <div style={{maxWidth:720,margin:"0 auto",padding:"60px 24px 80px"}}>
-          <div className="fadeUp" style={{marginBottom:40}}>
-            <div style={{display:"inline-block",background:C.lime,color:C.dark,fontSize:11,fontWeight:600,letterSpacing:"2px",padding:"5px 14px",borderRadius:20,marginBottom:20}}>
-              INTERVIEW COMPLETE
-            </div>
-            <h2 style={{fontFamily:"'Fraunces',serif",fontSize:42,fontWeight:600,letterSpacing:"-1px",lineHeight:1.15,marginBottom:10}}>
-              Well done,<br/><em style={{color:C.brown}}>here's your feedback.</em>
-            </h2>
-            <p style={{color:C.gray2,fontSize:15}}>{roleName} · {level} · {style}</p>
+          <h2 style={{fontFamily:"'Fraunces',serif",fontSize:42,marginBottom:10}}>Interview Complete</h2>
+          <div style={{background:C.white,border:`1.5px solid ${C.gray4}`,borderRadius:18,padding:"32px",marginBottom:32}}>
+             {evalText ? renderMsg(evalText) : "No evaluation."}
           </div>
-
-          <div className="fadeUp" style={{background:C.white,border:`1.5px solid ${C.gray4}`,borderRadius:18,padding:"32px",marginBottom:32,animationDelay:".12s",opacity:0,animationFillMode:"forwards"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,paddingBottom:16,borderBottom:`1px solid ${C.gray4}`}}>
-              <div style={{width:32,height:32,background:C.dark,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <div style={{width:14,height:14,background:C.lime,borderRadius:4}}/>
-              </div>
-              <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600}}>Final Evaluation</span>
-            </div>
-            <div style={{lineHeight:1.85}}>
-              {evalText ? renderMsg(evalText) : <p style={{color:C.gray3}}>No evaluation available.</p>}
-            </div>
-          </div>
-
-          <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-            <button onClick={reset} style={{background:C.dark,color:C.lime,border:"none",padding:"14px 32px",borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 4px 20px rgba(18,20,20,.15)"}}>
-              Try Again →
-            </button>
-            <button onClick={()=>{reset();}} style={{background:"transparent",border:`1.5px solid ${C.dark}`,color:C.dark,padding:"14px 32px",borderRadius:12,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>
-              Change Role
-            </button>
-          </div>
+          <button onClick={reset} style={{background:C.dark,color:C.lime,padding:"14px 32px",borderRadius:12,cursor:"pointer"}}>Try Again →</button>
         </div>
       )}
     </div>
