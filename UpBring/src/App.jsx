@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { BrowserRouter , Routes, Route, Link } from 'react-router-dom'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import LinkedInAuthButton from './feature/auth/linkedin_auth/auth_button'
 import GitHubAuthButton from './feature/auth/github_auth/auth_button'
-import GitHubCallback from './feature/auth/github_auth/github_callback'
 import { useLinkedInCallback } from './feature/auth/linkedin_auth/hooks/useLinkedInCallback'
+import AuthWrapper from './feature/auth/login/wrapper'
 
+/**
+ * Home — the protected main page.
+ * Only rendered when the user has an active Supabase session.
+ */
 function Home() {
   const [count, setCount] = useState(0)
 
@@ -20,14 +21,19 @@ function Home() {
         <LinkedInAuthButton />
         <GitHubAuthButton />
       </div>
-
     </>
   )
 }
 
+/**
+ * App — wraps Home in AuthWrapper so unauthenticated users
+ * are redirected to the login page automatically.
+ */
 function App() {
   return (
-    <div></div>
+    <AuthWrapper>
+      <Home />
+    </AuthWrapper>
   )
 }
 
