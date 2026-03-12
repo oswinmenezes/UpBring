@@ -55,7 +55,7 @@ const GitHubCallback = () => {
                         'Authorization': `Bearer ${accessToken}`
                     }
                 });
-                console.log(reposResponse);
+                console.log("res" + reposResponse);
 
                 const reposData = await reposResponse.json();
 
