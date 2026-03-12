@@ -16,10 +16,10 @@ const LinkedInAuthButton = () => {
     // LinkedIn OAuth 2.0 Configuration
     const clientId = import.meta.env.VITE_REACT_APP_LINKEDIN_CLIENT_ID || 'YOUR_CLIENT_ID_HERE';
     const redirectUri = `${window.location.origin}`; // Ensure this exactly matches your LinkedIn App settings
-    
-    // Standard OpenID Connect scopes
+
+    // Standard OpenID Connect scope s 
     const scope = 'openid profile email w_member_social';
-    
+
 
     // Generate a random state string to prevent CSRF attacks
     // In a real application, you should store this in localStorage/sessionStorage
