@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Zap, BookOpen, TrendingUp, Lightbulb, CheckCircle, AlertCircle } from 'lucide-react';
-import NavBar from "./navbar" // Using your existing NavBar
 
 const RoadmapPage = () => {
   const [domain, setDomain] = useState('IT');
