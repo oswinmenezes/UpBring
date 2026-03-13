@@ -73,7 +73,7 @@ ${repo.readme || 'No README found'}
         // Create new row in users table
         const { error: analysisError } = await supabase
           .from('users')
-          .insert(insertData);
+          .upsert(insertData);
 
         if (analysisError) {
           console.error('Error saving analysis to Supabase:', analysisError);

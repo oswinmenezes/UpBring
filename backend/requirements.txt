@@ -8,3 +8,4 @@ xgboost>=2.0.0
 pandas>=2.1.0
 numpy>=1.26.0
 PyGithub>=2.1.1
+openai>=1.0.0
