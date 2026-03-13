@@ -4,7 +4,9 @@ import {
   Zap, 
   MapPin, 
   Briefcase, 
-  ChevronRight 
+  ChevronRight,
+  User,
+  GraduationCap
 } from 'lucide-react';
 
 /**
@@ -19,7 +21,7 @@ const NavBar = () => {
         <div style={{ width: 28, height: 28, background: '#b5d336', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Zap size={16} color="#1a1a1a" />
         </div>
-        <span className="nav-logo-text">Upbring</span>
+        <span className="nav-logo-text">UpBring</span>
       </div>
       <div className="nav-links">
         <button onClick={() => scrollTo('home')} className="nav-link">Home</button>
@@ -40,28 +42,65 @@ const NavBar = () => {
  * MAIN JOB PORTAL PAGE
  */
 const JobPortal = () => {
-  const [skills] = useState(["Python", "Java", "JavaScript", "React", "PostgreSQL", "NextJS"]);
-  const [suitableRole, setSuitableRole] = useState("Fetching Role...");
+  const [userData, setUserData] = useState(null);
+  const [skills, setSkills] = useState([]);
+  const [suitableRole, setSuitableRole] = useState("Analyzing Profile...");
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchRoleAndJobs() {
+    async function fetchUserAndJobs() {
       try {
         setLoading(true);
-        // 1. Fetch Job Role based on skills
-        const roleRes = await fetch('http://localhost:5000/api/job/find-role', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ skills })
-        });
-        
-        let fetchedRole = "Software Engineer";
-        if (roleRes.ok) {
-          const roleData = await roleRes.json();
-          fetchedRole = roleData.role || fetchedRole;
+        // 0. Fetch Logged-in User
+        const { data: { user } } = await supabase.auth.getUser();
+
+        let profileData = null;
+        let activeSkills = [];
+
+        if (user) {
+          const { data, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+          if (!userError && data) {
+            profileData = data;
+            setUserData(data);
+            if (data.skills) {
+               activeSkills = data.skills.map(s => s.skill);
+               setSkills(activeSkills);
+            }
+          }
+        } else {
+             // Fallback for demo if not logged in
+             activeSkills = ["Python", "Machine Learning", "FastAPI", "React.js"];
+             setSkills(activeSkills);
         }
-        setSuitableRole(fetchedRole);
+
+        // 1. Fetch Job Role based on skills
+        let fetchedRole = "Software Engineer"; 
+        // Use existing roles from profile analysis if available to save API calls
+        if (profileData && profileData.profile_analysis && profileData.profile_analysis.suitable_roles && profileData.profile_analysis.suitable_roles.length > 0) {
+            fetchedRole = profileData.profile_analysis.suitable_roles[0];
+            setSuitableRole(fetchedRole);
+        } else if (activeSkills.length > 0) {
+            try {
+                const roleRes = await fetch('http://localhost:5000/api/job/find-role', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ skills: activeSkills })
+                });
+                if (roleRes.ok) {
+                const roleData = await roleRes.json();
+                fetchedRole = roleData.role || fetchedRole;
+                }
+            } catch (roleErr) {
+                console.error("Error calling find-role:", roleErr);
+            }
+            setSuitableRole(fetchedRole);
+        }
 
         // 2. Fetch Jobs from Supabase
         const { data: jobsData, error } = await supabase
@@ -88,8 +127,8 @@ const JobPortal = () => {
       }
     }
 
-    fetchRoleAndJobs();
-  }, [skills]);
+    fetchUserAndJobs();
+  }, []);
 
   return (
     <div className="app-container">
@@ -161,8 +200,36 @@ const JobPortal = () => {
           box-shadow: 0 10px 40px rgba(0,0,0,0.06);
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-start;
           border: 1px solid rgba(0,0,0,0.02);
+          gap: 40px;
+        }
+        .profile-info {
+           display: flex;
+           flex-direction: column;
+           gap: 10px;
+           flex: 1;
+        }
+        .profile-name {
+           font-family: var(--font-serif);
+           font-size: 28px;
+           font-weight: 700;
+           margin: 0;
+           display: flex;
+           align-items: center;
+           gap: 10px;
+        }
+        .profile-institution {
+           font-family: var(--font-sans);
+           font-size: 15px;
+           color: var(--text-muted);
+           display: flex;
+           align-items: center;
+           gap: 8px;
+           margin: 0;
+        }
+        .skills-group {
+            margin-top: 20px;
         }
         .skills-group h4 { 
           font-family: var(--font-sans); font-size: 11px; 
@@ -178,11 +245,31 @@ const JobPortal = () => {
           font-family: var(--font-sans);
           font-size: 13px;
           color: #444;
+          transition: background 0.3s;
         }
-        .role-display { text-align: right; }
+        .skill-tag:hover {
+            background: #e2e2e2;
+        }
+        .role-display { 
+            text-align: right; 
+            background: #fbfbfb;
+            padding: 30px;
+            border-radius: 16px;
+            border: 1px solid #f0f0f0;
+            min-width: 250px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .role-display h4 {
+            font-family: var(--font-sans); font-size: 11px; 
+            color: var(--text-muted); letter-spacing: 1.5px; 
+            text-transform: uppercase; margin-bottom: 10px; margin-top:0;
+        }
         .role-display h2 { 
           font-family: var(--font-serif); font-style: italic; 
-          font-size: 32px; margin: 8px 0 0 0;
+          font-size: 28px; margin: 0; color: var(--accent-green);
+          text-shadow: 0 1px 1px rgba(0,0,0,0.05);
         }
 
         /* Job Listings */
@@ -260,6 +347,11 @@ const JobPortal = () => {
           font-family: var(--font-sans);
           font-weight: 700;
           font-size: 14px;
+          transition: 0.2s;
+        }
+        .apply-link:hover {
+            opacity: 0.9;
+            transform: scale(1.02);
         }
 
         /* Footer */
@@ -277,18 +369,41 @@ const JobPortal = () => {
           font-size: 13px;
           color: var(--text-muted);
         }
+
+        @media (max-width: 768px) {
+            .profile-box {
+                flex-direction: column;
+                gap: 20px;
+            }
+            .role-display {
+                width: 100%;
+                text-align: left;
+                padding: 20px;
+            }
+        }
       `}</style>
 
  
 
       <section className="hero-section">
         <div className="profile-box">
-          <div className="skills-group">
-            <h4>Your Skills</h4>
-            <div className="skills-list">
-              {skills.map((skill, i) => (
-                <span key={i} className="skill-tag">{skill}</span>
-              ))}
+          <div className="profile-info">
+             <h1 className="profile-name">
+                 <User size={28} color="var(--accent-green)" />
+                 {userData?.full_name || "Guest Developer"}
+             </h1>
+             <p className="profile-institution">
+                 <GraduationCap size={18} />
+                 {userData?.institution || "No Institution Linked"}
+             </p>
+
+            <div className="skills-group">
+                <h4>Your Top Skills</h4>
+                <div className="skills-list">
+                {skills.length > 0 ? skills.slice(0, 10).map((skill, i) => (
+                    <span key={i} className="skill-tag">{skill}</span>
+                )) : <span className="skill-tag">No skills found</span>}
+                </div>
             </div>
           </div>
           <div className="role-display">
@@ -307,7 +422,7 @@ const JobPortal = () => {
         ) : (
           <div className="job-grid">
             {jobs.map((job) => {
-              const displayLevel = job.exp_level || job.level || 'Basic';
+              const displayLevel = job.exp_level || job.level || job.experience || 'Basic';
               const levelClass = displayLevel.toString().toLowerCase().includes('senior') || displayLevel.toString().toLowerCase().includes('advanced') ? 'advanced' :
                                  displayLevel.toString().toLowerCase().includes('mid') || displayLevel.toString().toLowerCase().includes('intermediate') ? 'intermediate' : 'basic';
               
@@ -320,7 +435,7 @@ const JobPortal = () => {
                     <h3 className="job-title">{job.title || job.role}</h3>
                     <p className="job-company">{job.company}</p>
                     <div className="job-meta" style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                      <span><MapPin size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> {job.location}</span>
+                      <span><MapPin size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> {job.location || 'Remote'}</span>
                       <span><Briefcase size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> {job.experience || 'Not specified'}</span>
                     </div>
                   </div>
@@ -336,7 +451,7 @@ const JobPortal = () => {
 
       <footer className="footer">
         <div className="footer-inner">
-          <p>© 2026 Upbring. All rights reserved.</p>
+          <p>© 2026 UpBring. All rights reserved.</p>
           <div style={{ display: 'flex', gap: '24px' }}>
             <span style={{ cursor: 'pointer' }}>Privacy Policy</span>
             <span style={{ cursor: 'pointer' }}>Terms of Service</span>

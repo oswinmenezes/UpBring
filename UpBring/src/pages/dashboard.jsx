@@ -12,20 +12,20 @@ export default function Dashboard() {
       try {
         setLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
-        
+
         if (user) {
           const { data, error: fetchError } = await supabase
             .from('users')
             .select('*')
             .eq('user_id', user.id)
-            .single();
+            .limit(1);
 
           if (fetchError) {
             console.error('Error fetching user data:', fetchError);
             setError(fetchError.message);
-          } else if (data) {
-            console.log('User data fetched successfully:', data);
-            setUserData(data);
+          } else if (data && data.length > 0) {
+            console.log('User data fetched successfully:', data[0]);
+            setUserData(data[0]);
           }
         }
       } catch (err) {
@@ -121,8 +121,8 @@ export default function Dashboard() {
               <div className="proficiency-display">
                 <div className="proficiency-score">{avgSkillLevel}/10</div>
                 <div className="progress-bar-bg">
-                  <div 
-                    className="progress-bar-fill" 
+                  <div
+                    className="progress-bar-fill"
                     style={{ width: `${(avgSkillLevel / 10) * 100}%` }}
                   ></div>
                 </div>
@@ -132,8 +132,8 @@ export default function Dashboard() {
                   <div key={idx} className="skill-item">
                     <span className="skill-name">{skill.skill}</span>
                     <div className="skill-bar-small">
-                      <div 
-                        className="skill-bar-fill" 
+                      <div
+                        className="skill-bar-fill"
                         style={{ width: `${(skill.proficiency / 10) * 100}%` }}
                       ></div>
                     </div>
