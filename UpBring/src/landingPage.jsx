@@ -1,5 +1,6 @@
 import React from 'react';
-import NavBar from './navbar';
+// import NavBar from './navbar';
+import {Link} from "react-router-dom";
 import { 
   Briefcase, 
   BarChart2, 
@@ -701,10 +702,10 @@ export default function Landing() {
             </p>
             
             <div className="hero-buttons">
-              <button className="btn-base btn-green">
+             <Link to="/"> <button className="btn-base btn-green">
                 <GraduationCap size={20} />
                 I'm a Student
-              </button>
+              </button></Link>
               <button className="btn-base btn-outline">
                 <Building size={20} />
                 I'm a University

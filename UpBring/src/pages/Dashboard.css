@@ -1,0 +1,145 @@
+/* Container & Background */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  background-color: #e8e8e3; /* Light grey/beige from theme */
+  min-height: 100vh;
+  gap: 20px;
+  padding: 20px;
+  font-family: 'Georgia', serif;
+}
+
+/* 1. Skill Analysis Header */
+.skill-analysis-banner {
+  background-color: #f0ecca; /* Theme pale yellow */
+  border: 1.5px solid #1a1a1a;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.banner-title {
+  margin: 0;
+  font-style: italic;
+  font-size: 24px;
+}
+
+/* 2. Body Layout */
+.dashboard-body {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+}
+
+/* 3. Sidebar (Profile & Skills) */
+.sidebar-panel {
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.sidebar-box {
+  padding: 24px;
+  text-align: center;
+}
+
+.profile-section {
+  border-bottom: 1.5px solid #e8e8e8;
+}
+
+.avatar-circle {
+  width: 60px;
+  height: 60px;
+  background: #b5d336; /* Theme Green */
+  border-radius: 50%;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.btn-outline-small {
+  margin-top: 20px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 8px;
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* 4. Main Content Area */
+.main-stats-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stats-top-row {
+  display: flex;
+  gap: 20px;
+  height: 250px;
+}
+
+.stat-card {
+  background: white;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.proficiency-card { flex: 1.5; }
+.eligibility-card { flex: 1; }
+
+.projects-section {
+  flex: 1;
+}
+
+.projects-grid {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.project-box {
+  flex: 1;
+  height: 150px;
+  background-color: #f0ecca;
+  border: 1px solid #1a1a1a;
+  border-radius: 12px;
+}
+
+/* 5. Progress Bar */
+.progress-bar-bg {
+  height: 10px;
+  background: #e8e8e8;
+  border-radius: 10px;
+  margin-top: 15px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #b5d336;
+  border-radius: 10px;
+}
+
+/* 6. Big Footer */
+.dashboard-big-footer {
+  background-color: #f0ecca;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+}
+
+.footer-logo {
+  font-weight: bold;
+  margin-bottom: 10px;
+}

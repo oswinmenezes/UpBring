@@ -183,8 +183,8 @@ export default function MockInterview() {
 
   // ── API (GEMINI FIXED) ──────────────────────────────────────────
   const callAPI = async (msgs, extra = "") => {
-    const API_KEY = "Apikey"; 
-    const URL = "url";
+    const API_KEY = "AIzaSyDnNQvFfTY_Jo9mxXRaoYbnzPkW8-WrIvU"; 
+    const URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
     // Map roles: Gemini only accepts "user" or "model"
     const contents = msgs.map(m => ({

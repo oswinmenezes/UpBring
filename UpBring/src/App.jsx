@@ -3,6 +3,8 @@ import LinkedInAuthButton from './feature/auth/linkedin_auth/auth_button'
 import GitHubAuthButton from './feature/auth/github_auth/auth_button'
 import { useLinkedInCallback } from './feature/auth/linkedin_auth/hooks/useLinkedInCallback'
 import AuthWrapper from './feature/auth/login/wrapper'
+import Landing from './landingPage'
+import Dashboard from './pages/dashboard'
 
 /**
  * Home — the protected main page.
@@ -32,7 +34,7 @@ function Home() {
 function App() {
   return (
     <AuthWrapper>
-      <Home />
+      <Dashboard />
     </AuthWrapper>
   )
 }
