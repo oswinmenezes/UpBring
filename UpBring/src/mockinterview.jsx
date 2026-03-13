@@ -183,7 +183,7 @@ export default function MockInterview() {
 
   // ── API (GEMINI FIXED) ──────────────────────────────────────────
   const callAPI = async (msgs, extra = "") => {
-    const API_KEY = "AIzaSyDnNQvFfTY_Jo9mxXRaoYbnzPkW8-WrIvU"; 
+    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; 
     const URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
     // Map roles: Gemini only accepts "user" or "model"
@@ -305,28 +305,7 @@ export default function MockInterview() {
         .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:${C.gray3};animation:shimmer 1.2s infinite}
         .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
       `}</style>
-
-      <nav style={{borderBottom:`1px solid ${C.gray4}`,background:C.white,padding:"0 40px",display:"flex",justifyContent:"space-between",alignItems:"center",height:60,position:"sticky",top:0,zIndex:50}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:28,height:28,background:C.dark,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <div style={{width:14,height:14,background:C.lime,borderRadius:3}}/>
-          </div>
-          <span style={{fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600}}>Growmark Interview</span>
-        </div>
-        <div style={{display:"flex",gap:10,alignItems:"center"}}>
-          {screen==="interview" && (
-            <button onClick={()=>{setAudioOn(e=>!e);if(speaking)stopSpeak();}}
-              style={{background:"transparent",border:`1.5px solid ${C.gray4}`,color:audioOn?C.dark:C.gray3,padding:"6px 14px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
-              {audioOn?"🔊 Sound on":"🔇 Muted"}
-            </button>
-          )}
-          {screen!=="setup" && (
-            <button onClick={reset} style={{background:C.dark,color:C.lime,border:"none",padding:"7px 18px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>
-              ← Restart
-            </button>
-          )}
-        </div>
-      </nav>
+ 
 
       {screen==="setup" && (
         <div style={{maxWidth:860,margin:"0 auto",padding:"52px 24px 80px"}}>

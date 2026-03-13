@@ -220,6 +220,7 @@ def get_skills_to_learn():
             return jsonify(result), 404
         return jsonify(result)
     except Exception as e:
+        print(e)
         return jsonify({'error': str(e)}), 500
 
 

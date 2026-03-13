@@ -12,7 +12,7 @@ load_dotenv()
 
 # ─── Gemini client ────────────────────────────────────────────────────────────
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-_gemini = genai.GenerativeModel("gemini-1.5-flash")
+_gemini = genai.GenerativeModel("gemini-2.5-flash")
 
 # ─── Master skill list (column order MUST match feature2.csv columns) ─────────
 MASTER_SKILLS = [
@@ -106,7 +106,11 @@ def skill_to_learn(user_skill_set: list[str], role_name: str) -> dict:
       "role": "{role_name}",
       "description": "A brief, professional overview of the role.",
       "roadmap": ["Step-by-step list of how to master the missing skills"],
-      "courselinks": ["A list of high-quality resource names and URLs (e.g., Coursera, Udemy, MDN, Documentation)"]
+      "marketDemand": "A short sentence about the current market demand for this role.",
+      "advices": "A short piece of professional advice for someone transitioning into this role.",
+      "courses": [
+        {{"name": "Course Title", "platform": "Platform Name (e.g. Coursera, Udemy)", "link": "https://..."}}
+      ]
     }}
     Return ONLY the JSON object. Do not include markdown code blocks or extra text.
     """
@@ -114,7 +118,11 @@ def skill_to_learn(user_skill_set: list[str], role_name: str) -> dict:
     response = _gemini.generate_content(prompt)
 
     try:
-        return json.loads(response.text)
+        result = json.loads(response.text)
+        result["missingSkills"] = skills_needed
+        return result
     except json.JSONDecodeError:
         cleaned = response.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(cleaned)
+        result = json.loads(cleaned)
+        result["missingSkills"] = skills_needed
+        return result

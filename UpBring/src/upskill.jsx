@@ -1,21 +1,74 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Zap, BookOpen, TrendingUp, Lightbulb, CheckCircle, AlertCircle } from 'lucide-react';
+import supabase from './services/supabase_client';
 
 const RoadmapPage = () => {
   const [domain, setDomain] = useState('IT');
-  const [role, setRole] = useState('Data Science');
+  const [role, setRole] = useState('Data Scientist');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [userSkills, setUserSkills] = useState(["Python", "Basic Statistics", "SQL", "Excel"]);
+  
+  const [analysis, setAnalysis] = useState({
+    currentSkills: [],
+    missingSkills: [],
+    roleDesc: "Select a role and click Analyze to generate your personalized career path.",
+    marketDemand: "Awaiting analysis...",
+    advices: "Awaiting analysis...",
+    courses: []
+  });
 
-  // Hardcoded analysis data for mapping
-  const analysis = {
-    currentSkills: ["Python", "Basic Statistics", "SQL", "Excel"],
-    missingSkills: ["Machine Learning", "Deep Learning", "AWS SageMaker", "Tableau"],
-    roleDesc: "Data Scientists use data to understand and solve complex problems. This role requires a blend of programming, statistical proficiency, and business intuition.",
-    marketDemand: "High - 25% projected growth over the next 3 years.",
-    advices: "Focus on building a portfolio with real-world datasets rather than just certifications.",
-    courses: [
-      { name: "ML Specialization", platform: "Coursera", link: "#" },
-      { name: "Deep Learning Foundations", platform: "Udacity", link: "#" }
-    ]
+  useEffect(() => {
+    async function fetchUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (!error && data && data.skills) {
+          const activeSkills = data.skills.map(s => s.skill);
+          if (activeSkills.length > 0) {
+              setUserSkills(activeSkills);
+              setAnalysis(prev => ({ ...prev, currentSkills: activeSkills }));
+          }
+        }
+      } else {
+          setAnalysis(prev => ({ ...prev, currentSkills: userSkills }));
+      }
+    }
+    fetchUser();
+  }, []);
+
+  const handleAnalyze = async () => {
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/job/skill-to-learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skills: userSkills, role: role })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (!data.error) {
+           setAnalysis({
+             currentSkills: userSkills,
+             missingSkills: data.missingSkills || [],
+             roleDesc: data.description || "",
+             marketDemand: data.marketDemand || "High",
+             advices: data.advices || "Keep practicing.",
+             roadmap: data.roadmap || [],
+             courses: data.courses || []
+           });
+        }
+      }
+    } catch (err) {
+       console.error("Failed to analyze:", err);
+    } finally {
+       setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -64,18 +117,30 @@ const RoadmapPage = () => {
         <h1 className="role-header" style={{fontStyle: 'italic'}}>Career Path Analyzer</h1>
         <p style={{fontFamily: 'Arial', color: '#666'}}>Select your target and we'll bridge the gap.</p>
         
-        <div className="selector-group">
-          <select onChange={(e) => setDomain(e.target.value)}>
+        <div className="selector-group" style={{alignItems: 'center'}}>
+          <select onChange={(e) => setDomain(e.target.value)} value={domain}>
             <option>IT</option>
             <option>Commerce</option>
             <option>Medical</option>
           </select>
-          <select onChange={(e) => setRole(e.target.value)}>
-            <option>Data Science</option>
-            <option>Full Stack</option>
-            <option>DevOps</option>
-            <option>Backend</option>
+          <select onChange={(e) => setRole(e.target.value)} value={role}>
+            <option value="Data Scientist">Data Scientist</option>
+            <option value="Full Stack Developer">Full Stack Developer</option>
+            <option value="Backend Developer">Backend Developer</option>
+            <option value="Frontend Developer">Frontend Developer</option>
+            <option value="Mobile Developer">Mobile Developer</option>
+            <option value="DevOps Engineer">DevOps Engineer</option>
+            <option value="ML Engineer">ML Engineer</option>
+            <option value="Software Engineer">Software Engineer</option>
           </select>
+          <button 
+            onClick={handleAnalyze} 
+            disabled={isAnalyzing}
+            className="btn-learn" 
+            style={{padding: '12px 24px', fontSize: '15px'}}
+          >
+            {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+          </button>
         </div>
       </section>
 
@@ -113,19 +178,36 @@ const RoadmapPage = () => {
             
             <h4 className="nav-logo-text" style={{marginTop: '25px'}}><Lightbulb size={18} /> Professional Advice</h4>
             <p style={{fontFamily: 'Arial', fontSize: '15px'}}>{analysis.advices}</p>
+
+            <h4 className="nav-logo-text" style={{marginTop: '25px'}}><CheckCircle size={18} /> Action Plan</h4>
+            {analysis.roadmap && analysis.roadmap.length > 0 ? (
+                <ul style={{fontFamily: 'Arial', fontSize: '14px', color: '#444', paddingLeft: '20px'}}>
+                    {analysis.roadmap.map((step, i) => <li key={i} style={{marginBottom: '8px'}}>{step}</li>)}
+                </ul>
+            ) : (
+                <p style={{fontFamily: 'Arial', fontSize: '14px', color: '#888'}}>Generate your personalized plan.</p>
+            )}
           </div>
 
           <div>
             <h4 className="nav-logo-text"><BookOpen size={18} /> Recommended Courses</h4>
-            {analysis.courses.map(course => (
-              <div key={course.name} className="resource-card">
+            {analysis.courses && analysis.courses.length > 0 ? analysis.courses.map((course, idx) => (
+              <div key={idx} className="resource-card">
                 <div>
                   <div style={{fontWeight: '700', fontFamily: 'Arial'}}>{course.name}</div>
                   <div style={{fontSize: '12px', color: '#888'}}>{course.platform}</div>
                 </div>
-                <button className="btn-learn">Explore</button>
+                {course.link && course.link !== "#" ? (
+                    <a href={course.link} target="_blank" rel="noopener noreferrer">
+                        <button className="btn-learn">Explore</button>
+                    </a>
+                ) : (
+                    <button className="btn-learn" style={{opacity: 0.5, cursor: 'not-allowed'}}>Search</button>
+                )}
               </div>
-            ))}
+            )) : (
+              <p style={{fontFamily: 'Arial', fontSize: '14px', color: '#888'}}>No courses suggested yet.</p>
+            )}
           </div>
         </div>
       </div>
