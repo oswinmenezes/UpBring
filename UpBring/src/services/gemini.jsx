@@ -16,7 +16,8 @@ export async function analyzeCandidate(text) {
     Return a JSON object with this structure:
     {
       "profile": { "name": "" },
-      "skills": [{ "skill": "", "proficiency": 0 }],
+      "institution": "",
+      "skills": [{ "skill": "", "proficiency": 0-10 }],
       "showcase": [{ "title": "", "description": "" }],
       "suitable_roles": []
     }
@@ -41,6 +42,7 @@ export async function analyzeCandidate(text) {
     console.error("Gemini Error:", error);
     return {
       profile: { name: "Error" },
+      institution: "",
       skills: [],
       showcase: [],
       suitable_roles: []
