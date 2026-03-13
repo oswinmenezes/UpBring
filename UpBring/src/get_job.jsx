@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import supabase from './services/supabase_client';
 import { 
   Zap, 
   MapPin, 
@@ -39,37 +40,56 @@ const NavBar = () => {
  * MAIN JOB PORTAL PAGE
  */
 const JobPortal = () => {
-  const userProfile = {
-    skills: ["Python", "Java", "Pandas", "React", "SQL", "Scikit-Learn"],
-    suitableRole: "Data Science / Full Stack Developer"
-  };
+  const [skills] = useState(["Python", "Java", "JavaScript", "React", "PostgreSQL", "NextJS"]);
+  const [suitableRole, setSuitableRole] = useState("Fetching Role...");
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const jobs = [
-    {
-      id: 1,
-      company: "Nexus Data Systems",
-      location: "San Francisco, CA",
-      level: "Advanced",
-      role: "Senior Data Scientist",
-      link: "#"
-    },
-    {
-      id: 2,
-      company: "GreenTech Solutions",
-      location: "Remote",
-      level: "Intermediate",
-      role: "Full Stack Engineer",
-      link: "#"
-    },
-    {
-      id: 3,
-      company: "SoftGrid Corp",
-      location: "New York, NY",
-      level: "Basic",
-      role: "Junior Web Developer",
-      link: "#"
+  useEffect(() => {
+    async function fetchRoleAndJobs() {
+      try {
+        setLoading(true);
+        // 1. Fetch Job Role based on skills
+        const roleRes = await fetch('http://localhost:5000/api/job/find-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ skills })
+        });
+        
+        let fetchedRole = "Software Engineer";
+        if (roleRes.ok) {
+          const roleData = await roleRes.json();
+          fetchedRole = roleData.role || fetchedRole;
+        }
+        setSuitableRole(fetchedRole);
+
+        // 2. Fetch Jobs from Supabase
+        const { data: jobsData, error } = await supabase
+          .from('jobs')
+          .select('*')
+          .ilike('role', `%${fetchedRole}%`)
+          .limit(10);
+
+        if (error) {
+          console.error("Supabase query error:", error);
+        } else {
+          // If no matches, fetch general jobs
+          if (!jobsData || jobsData.length === 0) {
+             const { data: fallbackData } = await supabase.from('jobs').select('*').limit(6);
+             setJobs(fallbackData || []);
+          } else {
+             setJobs(jobsData);
+          }
+        }
+      } catch (err) {
+        console.error("Error in fetchRoleAndJobs:", err);
+      } finally {
+        setLoading(false);
+      }
     }
-  ];
+
+    fetchRoleAndJobs();
+  }, [skills]);
 
   return (
     <div className="app-container">
@@ -266,39 +286,52 @@ const JobPortal = () => {
           <div className="skills-group">
             <h4>Your Skills</h4>
             <div className="skills-list">
-              {userProfile.skills.map((skill, i) => (
+              {skills.map((skill, i) => (
                 <span key={i} className="skill-tag">{skill}</span>
               ))}
             </div>
           </div>
           <div className="role-display">
             <h4>Recommended Role</h4>
-            <h2>{userProfile.suitableRole}</h2>
+            <h2>{suitableRole}</h2>
           </div>
         </div>
       </section>
 
       <main className="jobs-container">
         <h2 className="section-header">Recommended Opportunities</h2>
-        <div className="job-grid">
-          {jobs.map((job) => (
-            <div key={job.id} className="job-card">
-              <div>
-                <span className={`level-pill level-${job.level.toLowerCase()}`}>
-                  {job.level}
-                </span>
-                <h3 className="job-title">{job.role}</h3>
-                <p className="job-company">{job.company}</p>
-                <div className="job-meta">
-                  <MapPin size={14} /> {job.location}
+        {loading ? (
+          <p>Loading your opportunities...</p>
+        ) : jobs.length === 0 ? (
+          <p>No jobs found for this role at the moment.</p>
+        ) : (
+          <div className="job-grid">
+            {jobs.map((job) => {
+              const displayLevel = job.exp_level || job.level || 'Basic';
+              const levelClass = displayLevel.toString().toLowerCase().includes('senior') || displayLevel.toString().toLowerCase().includes('advanced') ? 'advanced' :
+                                 displayLevel.toString().toLowerCase().includes('mid') || displayLevel.toString().toLowerCase().includes('intermediate') ? 'intermediate' : 'basic';
+              
+              return (
+                <div key={job.id} className="job-card">
+                  <div>
+                    <span className={`level-pill level-${levelClass}`}>
+                      {displayLevel}
+                    </span>
+                    <h3 className="job-title">{job.title || job.role}</h3>
+                    <p className="job-company">{job.company}</p>
+                    <div className="job-meta" style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                      <span><MapPin size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> {job.location}</span>
+                      <span><Briefcase size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> {job.experience || 'Not specified'}</span>
+                    </div>
+                  </div>
+                  <a href={job.link || '#'} className="apply-link" target="_blank" rel="noopener noreferrer">
+                    View Details <ChevronRight size={16} />
+                  </a>
                 </div>
-              </div>
-              <a href={job.link} className="apply-link">
-                View Details <ChevronRight size={16} />
-              </a>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </main>
 
       <footer className="footer">
