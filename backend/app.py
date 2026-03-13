@@ -1,10 +1,12 @@
 import os
+import tempfile
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
 from github import Github, GithubException
 from JobModel import find_job_role, skill_to_learn
+from ocr import send_image_as_base64
 
 # Load environment variables
 load_dotenv()
@@ -93,6 +95,70 @@ def get_github_repos():
         return jsonify({'error': e.data.get('message', 'GitHub API error')}), e.status
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ─── OCR Endpoints ──────────────────────────────────────────────────────────
+
+@app.route('/api/ocr/extract-text', methods=['POST'])
+def extract_text_from_image():
+    """
+    Extract text from an uploaded image using OCR.
+
+    Request:
+        - File upload: multipart/form-data with key 'image'
+        - The image file (JPG, PNG, etc.)
+
+    Response (JSON):
+        {
+            "success": true,
+            "extracted_text": "The extracted text from the image..."
+        }
+    """
+    # Check if image file is in the request
+    if 'image' not in request.files:
+        return jsonify({'success': False, 'error': 'No image file provided in request'}), 400
+
+    image_file = request.files['image']
+    
+    if image_file.filename == '':
+        return jsonify({'success': False, 'error': 'No image file selected'}), 400
+
+    # Validate file extension
+    allowed_extensions = {'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'}
+    if not ('.' in image_file.filename and image_file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+        return jsonify({'success': False, 'error': 'Invalid file type. Allowed: jpg, jpeg, png, gif, bmp, webp'}), 400
+
+    try:
+        # Save the image temporarily using system temp directory
+        temp_dir = tempfile.gettempdir()
+        temp_image_path = os.path.join(temp_dir, image_file.filename)
+        image_file.save(temp_image_path)
+
+        # Get API key from environment
+        api_key = os.getenv('HUGGING_FACE_API')
+        if not api_key:
+            return jsonify({'success': False, 'error': 'API key not configured on server'}), 500
+
+        # Extract text using OCR
+        extracted_text = send_image_as_base64(temp_image_path, api_key)
+
+        # Clean up temporary file
+        if os.path.exists(temp_image_path):
+            os.remove(temp_image_path)
+
+        return jsonify({
+            'success': True,
+            'extracted_text': extracted_text
+        }), 200
+
+    except ValueError as e:
+        # Handle file read errors
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except RuntimeError as e:
+        # Handle OCR processing errors
+        return jsonify({'success': False, 'error': str(e)}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Unexpected error: {str(e)}'}), 500
+
 
 # ─── Job Model Endpoints ────────────────────────────────────────────────────
 

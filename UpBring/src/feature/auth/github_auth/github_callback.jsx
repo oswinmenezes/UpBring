@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * GitHubCallback Component
  * 
  * Handles the redirect from GitHub OAuth.
- * Extracts the authorization code from the URL and should exchange it for an access token.
+ * Extracts the authorization code from the URL and exchanges it for an access token.
+ * Redirects to the onboarding page upon successful authentication.
  */
 const GitHubCallback = () => {
+    const navigate = useNavigate();
     const [status, setStatus] = useState('Processing authentication...');
     const [repos, setRepos] = useState([]);
     const [error, setError] = useState(null);
@@ -66,6 +69,15 @@ const GitHubCallback = () => {
                 const fetchedRepos = reposData.repos || [];
                 setRepos(fetchedRepos);
                 setStatus(`Successfully fetched ${fetchedRepos.length} repositories along with their READMEs.`);
+
+                // Store repos in sessionStorage for access in onboarding page
+                sessionStorage.setItem('githubRepos', JSON.stringify(fetchedRepos));
+                sessionStorage.setItem('githubAccessToken', accessToken);
+
+                // Redirect to onboarding after successful authentication
+                setTimeout(() => {
+                    navigate('/onboarding', { replace: true });
+                }, 2000);
 
             } catch (err) {
                 console.error('Error during GitHub Auth callback:', err);
